@@ -1,0 +1,43 @@
+[project]
+name = "ntac"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Ben Jourdan", email = "ben@jourdan.me" }
+]
+requires-python = ">=3.10"
+dependencies = [
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "build",
+    "furo",
+    "pre-commit>=4.2.0",
+    "pytest",
+    "ruff",
+    "sphinx",
+    "twine",
+]
+
+[project.scripts]
+ntac = "ntac:main"
+
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
