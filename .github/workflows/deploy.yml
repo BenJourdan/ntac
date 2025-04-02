@@ -12,6 +12,9 @@ on:
         required: false
         default: "true"
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
     name: Deploy Docs and/or Publish to PyPI
