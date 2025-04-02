@@ -1,0 +1,57 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_docs:
+        description: "Deploy Sphinx documentation?"
+        required: false
+        default: "true"
+      publish_pypi:
+        description: "Publish to PyPI?"
+        required: false
+        default: "true"
+
+jobs:
+  deploy:
+    name: Deploy Docs and/or Publish to PyPI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Build distribution
+        if: ${{ github.event.inputs.publish_pypi == 'true' }}
+        run: uv run python -m build
+
+      - name: Publish to PyPI
+        if: ${{ github.event.inputs.publish_pypi == 'true' }}
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: uv run twine upload dist/*
+
+      - name: Build docs
+        if: ${{ github.event.inputs.deploy_docs == 'true' }}
+        run: uv run sphinx-build -b html docs/source docs/build/html
+
+      - name: Deploy docs to GitHub Pages
+        if: ${{ github.event.inputs.deploy_docs == 'true' }}
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/build/html
