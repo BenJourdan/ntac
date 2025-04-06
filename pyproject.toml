@@ -8,6 +8,11 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
+    "numba>=0.61.0",
+    "pandas>=2.2.3",
+    "scikit-learn>=1.6.1",
+    "scipy>=1.15.2",
+    "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]
@@ -30,8 +35,10 @@ line-length = 88
 
 [tool.ruff]
 line-length = 88
-select = ["E", "F", "I"]
-ignore = ["E501"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "D"]
+ignore = ["E501", "D203", "D213", "D210", "D401", "D202", "I001"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

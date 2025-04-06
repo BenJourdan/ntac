@@ -1,9 +1,8 @@
+"""# Dummy tests."""
+
 # dummy test file
 
 
 def test_dummy():
-    assert True
-
-
-def test_dummy_2():
+    """Dummy test to ensure that pytest is working correctly."""
     assert True

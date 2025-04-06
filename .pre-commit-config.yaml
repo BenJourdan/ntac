@@ -17,3 +17,4 @@ repos:
         entry: uv run pytest
         language: system  # run the command as-is using system shell
         types: [python]
+        args:  ["tests"]
