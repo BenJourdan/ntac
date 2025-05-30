@@ -1,11 +1,20 @@
 """ntac package initialization."""
 
-from .data import GraphData
-from .ntac import Ntac
+from .visualizer import Visualizer
+from .data import download_flywire_data
 
-__all__ = ["GraphData", "Ntac"]
 
+from . import seeded
+from . import unseeded
+
+__all__ = [
+    "Visualizer",
+    "download_flywire_data",
+    "seeded",
+    "unseeded",
+]
 
 def main() -> None:
     """Run the main entry point of the ntac package."""
     print("Hello from ntac!")
+    download_flywire_data(verbose=True)
