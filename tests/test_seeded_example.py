@@ -4,11 +4,11 @@ from os.path import join
 
 
 
-# first download the data. This will be cached in ~/.ntac/flywire_data
+# first download the flywire data we'll need for this example. This will be cached in ~/.ntac/flywire_data
 ntac.download_flywire_data(verbose=True)
 
 
-# Ntac is happy to accept an aribtrary CSR adjacency matrix and a list of labels
+# SeededNtac is happy to accept an aribtrary CSR adjacency matrix and a list of labels
 # where ? corresponds to unlabeled nodes. In this example we will use 
 # the flywire dataset, for which we have a custom data loader.
 
