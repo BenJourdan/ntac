@@ -6,10 +6,12 @@ Neuronal Type Assignment with Connectivity
 ## dev tips:
 
 install uv:
-`curl -LsSf https://astral.sh/uv/install.sh | sh`
+`curl -fsSL https://pixi.sh/install.sh | bash`
 
-sync uv with :
-` uv sync --all-extras`
+## examples
 
-setup pre-commit hooks:
-`uv run pre-commit install`
+Seeded example:
+`pixi run python tests/test_seeded_example.py`
+
+Unseeded example:
+`pixi run python tests/test_unseeded_example.py`
