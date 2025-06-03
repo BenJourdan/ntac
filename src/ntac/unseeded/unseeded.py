@@ -1,6 +1,6 @@
 from .util import Partition, weighted_jaccard_distance, describe_sol
 from .problem import Problem
-from .seeded import solve_seeded, solve_seeded_alternative, features_and_medians
+from .seeded import solve_seeded, features_and_medians
 from numba import njit
 import math
 import os
@@ -21,12 +21,8 @@ def solve_unseeded(problem, max_k, partition=None, center_size=5, output_name=No
 
     assert partition is None or partition.size() <= max_k
     if partition is None: partition = Partition(clusters=[range(problem.numv)])
-    if problem.seeded_method == 1:
-        print("Using alternative seeded method.")
-        assert problem.data is not None
-        solve_seeded_method = solve_seeded_alternative
-    else:
-        solve_seeded_method = solve_seeded
+
+    solve_seeded_method = solve_seeded
 
     best_history = [ (partition, partition_cost(problem, partition)) ]
     while partition.size() <= max_k:

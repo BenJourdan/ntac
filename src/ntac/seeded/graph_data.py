@@ -36,7 +36,9 @@ class GraphData:
         self.labeled_nodes = np.where(self.labels != self.unlabeled_symbol)[0]
         #self.unique_labels = np.unique(self.labels)
         self.unique_labels  = np.unique(self.labels[self.labeled_nodes])
-    
+
+
+ 
     def get_metrics(self, partition, indices, gt_labels):
         """
         Calculate evaluation metrics over the specified node indices.

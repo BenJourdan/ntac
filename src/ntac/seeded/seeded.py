@@ -5,6 +5,7 @@ from numba import njit, prange
 import scipy.sparse as sp
 from .graph_data import GraphData
 
+from .. import unseeded
 
 class SeededNtac:
     def __init__(self, data, labels = None, lr=0.3, topk=1, verbose=False):
@@ -26,7 +27,7 @@ class SeededNtac:
         # Check if data is of type csr_matrix; convert to GraphData if needed.
         type_error = "data should be of the type csr_matrix or graph_data"
         if sp.issparse(data):
-            assert labels is not None, "labels should be provided if data is a csr_matrix"
+            labels = np.array(["?"] * data.shape[0]) if labels is None else labels
             try:
                 data = GraphData(adj_csr=data, labels=labels)
             except Exception as e:
@@ -55,7 +56,17 @@ class SeededNtac:
         self.labels = np.array([label_mapping[p] if p != data.unlabeled_symbol else -1 for p in labels])
        
 
-
+    def solve_unseeded(self, max_k, center_size=5, output_name=None, info_step=1, max_iterations=12, frac_seeds=0.1, chunk_size=6000):
+        partition = None # forcing to None for now, because I dont want to expose the Partition class to the user. Can add later
+        problem = unseeded.convert.problem_from_data(self.data) #move to init?
+        #this crashes when some of the labels are "?"
+        best_partition, last_partition, best_history = unseeded.solve_unseeded(problem, max_k, partition, center_size, output_name, info_step, max_iterations, frac_seeds, chunk_size)
+        partition = best_partition
+        labels = np.array(problem.match_refsol(partition).labels())
+        # we need to see how we do this when we don't actually get labels in the problem
+        named_labels = np.array([ problem.cluster_names[labels[u]] for u in range(problem.numv) ])
+        self.partition = np.array([self.label_mapping[x] for x in named_labels])
+        self.embedding = problem.new_vectors(partition)
    
     def initialize(self):
         """
@@ -545,3 +556,136 @@ class SeededNtac:
             np.ndarray: Array of labels corresponding to the current partition.
         """
         return np.array([self.reverse_mapping[p] for p in self.partition])
+
+
+
+    def build_class_ptrs(self):
+        """
+        Build flattened arrays mapping each class to its frozen-column indices in the similarity matrix.
+        Populates:
+          - self._fro_cols: int32[R] array of all frozen-column indices grouped by class
+          - self._fro_ptr:  int32[K+1] array of pointers into _fro_cols
+        """
+        K = self.k
+        # Initialize pointer array
+        fro_ptr = np.zeros(K + 1, dtype=np.int32)
+        cols = []
+        idx = 0
+        # For each class, collect the indices of frozen_partition equal to that class
+        for c in range(K):
+            # mark the start of class c
+            fro_ptr[c] = idx
+            # find columns j where frozen_partition[j] == c
+            for j, cls in enumerate(self.frozen_partition):
+                if cls == c:
+                    cols.append(j)
+                    idx += 1
+        # final pointer
+        fro_ptr[K] = idx
+        # store
+        self._fro_cols = np.array(cols, dtype=np.int32)
+        self._fro_ptr  = fro_ptr
+
+    @staticmethod
+    @njit(parallel=True)
+    def _topk_njit(sim, fro_cols, fro_ptr, topk, K):
+        """
+        Numba kernel: for each of n rows in sim (shape n×M), compute the top-k distinct classes:
+        - sim[i, j]: similarity of node i to frozen-column j
+        - fro_cols, fro_ptr define which j's belong to which class
+        Returns:
+          topk_inds: int32[n×topk] of class indices
+          topk_vals: float32[n×topk] of their max-sim values
+        """
+        n, M = sim.shape
+        # outputs
+        topk_inds = np.empty((n, topk), dtype=np.int32)
+        topk_vals = np.empty((n, topk), dtype=np.float32)
+
+        # scratch per-class array
+        for i in prange(n):
+            # 1) compute max similarity per class
+            class_scores = np.zeros(K, dtype=np.float32)
+            for c in range(K):
+                start = fro_ptr[c]
+                end   = fro_ptr[c+1]
+                maxv = 0.0
+                for idx in range(start, end):
+                    j = fro_cols[idx]
+                    v = sim[i, j]
+                    if v > maxv:
+                        maxv = v
+                class_scores[c] = maxv
+
+            # 2) partial-sort to find topk classes
+            # initialize
+            for t in range(topk):
+                topk_inds[i, t] = t
+                topk_vals[i, t] = class_scores[t]
+            # sort initial window
+            for a in range(topk):
+                for b in range(a+1, topk):
+                    if topk_vals[i, b] > topk_vals[i, a]:
+                        tmpv = topk_vals[i, a]; topk_vals[i, a] = topk_vals[i, b]; topk_vals[i, b] = tmpv
+                        tmpc = topk_inds[i, a]; topk_inds[i, a] = topk_inds[i, b]; topk_inds[i, b] = tmpc
+            # process rest
+            for c in range(topk, K):
+                v = class_scores[c]
+                if v > topk_vals[i, topk-1]:
+                    # find insertion point
+                    pos = topk-1
+                    while pos >= 0 and v > topk_vals[i, pos]:
+                        pos -= 1
+                    pos += 1
+                    # shift down
+                    for s in range(topk-1, pos, -1):
+                        topk_vals[i, s] = topk_vals[i, s-1]
+                        topk_inds[i, s] = topk_inds[i, s-1]
+                    topk_vals[i, pos] = v
+                    topk_inds[i, pos] = c
+
+        return topk_inds, topk_vals
+    
+    def get_topk_partition(self,  k=None):
+        """
+        Returns the top-k partition labels and their similarity scores for each node,
+        formatted as a dict mapping node_index → list of (label, similarity) tuples.
+
+        Parameters:
+            k (int): Number of top labels to return. 
+
+        Returns:
+            Dict[int, List[Tuple[label, float]]]: A dictionary where each key is a node index (0…n-1)
+            and each value is a list of `k` tuples `(original_label, similarity_score)`, sorted by descending score.
+        """
+
+        # Ensure class pointers are built
+        if not hasattr(self, "_fro_cols"):
+            self.build_class_ptrs()
+
+        # Cast similarity matrix to float32 for the Numba kernel
+        sim = self.similarity_matrix_to_frozen.astype(np.float32)
+
+        # Run the Numba kernel: returns (n × topk) arrays of class‐indices and their max‐similarity scores
+        topk_inds, topk_vals = SeededNtac._topk_njit(
+            sim,
+            self._fro_cols,
+            self._fro_ptr,
+            k,
+            self.k
+        )
+
+        n = sim.shape[0]
+        result = {}
+
+        # Build a dict mapping node → [(label, score), …]
+        for i in range(n):
+            tuples = []
+            for j in range(k):
+                num_label = int(topk_inds[i, j])
+                original_label = self.reverse_mapping[num_label]
+                score = float(topk_vals[i, j])
+                tuples.append((original_label, score))
+            result[i] = tuples
+
+        return result

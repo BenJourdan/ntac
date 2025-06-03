@@ -2,16 +2,20 @@
 
 from .visualizer import Visualizer
 from .data import download_flywire_data
+from scipy.sparse import csr_array
 
 
-from . import seeded
-from . import unseeded
+# from . import seeded
+# from . import unseeded
+
+from .seeded import SeededNtac as Ntac
+
+
 
 __all__ = [
     "Visualizer",
     "download_flywire_data",
-    "seeded",
-    "unseeded",
+    "Ntac"
 ]
 
 def main() -> None:

@@ -70,23 +70,23 @@ def solve_seeded(problem, centers, max_iterations=12, verbose=False):
 
 # The metrics output by data are meaningless now as they don't look for the best match with the reference solution;
 # but we can use problem.eval_metrics to the result of this function
-from .convert import partition_from_nt
-from ..seeded import SeededNtac
+# from .convert import partition_from_nt
+# from ..seeded import SeededNtac
 
 
-def solve_seeded_alternative(problem, centers, max_iterations=12, lr=0.3, verbose=True):
-    data = problem.data
-    labels = np.zeros_like(data.labels)
-    unlabeled = list(set(range(problem.numv)) - set().union(*centers))
-    labels[unlabeled] = data.unlabeled_symbol
-    for (i, cl) in enumerate(centers):
-        for u in cl:
-            labels[u] = problem.cluster_names[i]
+# def solve_seeded_alternative(problem, centers, max_iterations=12, lr=0.3, verbose=True):
+#     data = problem.data
+#     labels = np.zeros_like(data.labels)
+#     unlabeled = list(set(range(problem.numv)) - set().union(*centers))
+#     labels[unlabeled] = data.unlabeled_symbol
+#     for (i, cl) in enumerate(centers):
+#         for u in cl:
+#             labels[u] = problem.cluster_names[i]
 
-    print("Learning rate =", lr)
-    nt = SeededNtac(data = data, labels =labels, lr=lr, topk=1, verbose=verbose)
-    for i in range(max_iterations):
-        if verbose: print(f"Step {i}")
-        nt.step()
-    partition = partition_from_nt(nt, data)
-    return partition
+#     print("Learning rate =", lr)
+#     nt = SeededNtac(data = data, labels =labels, lr=lr, topk=1, verbose=verbose)
+#     for i in range(max_iterations):
+#         if verbose: print(f"Step {i}")
+#         nt.step()
+#     partition = partition_from_nt(nt, data)
+#     return partition

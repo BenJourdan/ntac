@@ -2,7 +2,7 @@ import ntac
 import os
 from os.path import join
 
-
+from ntac import Ntac
 
 # first download the flywire data we'll need for this example. This will be cached in ~/.ntac/flywire_data
 ntac.download_flywire_data(verbose=True)
@@ -62,7 +62,18 @@ labels[test_indices] = data.unlabeled_symbol
 
 
 
-nt = ntac.seeded.SeededNtac(data = data, labels =labels, lr=1, topk=1, verbose=True)
+nt = Ntac(data = data, labels = None, lr=1, topk=1, verbose=True)
+
+nt.solve_unseeded(max_k=10, max_iterations=5)
+final_partition = nt.get_partition()
+vis = ntac.Visualizer(nt, data)
+metrics = data.get_metrics(final_partition, test_indices, data.labels)
+vis.plot_acc_vs_class_size(metrics, test_indices=test_indices)
+
+
+
+
+nt = Ntac(data = data, labels = labels, lr=1, topk=1, verbose=True)
 num_iters = 15
 for i in range(num_iters):
     print(f"Step {i}")
@@ -84,7 +95,7 @@ adj_csr = data.adj_csr
 labels = labels
 
 # Now we can pass SeededNtac the adjacency matrix and labels
-nt = ntac.seeded.SeededNtac(data = adj_csr, labels =labels, lr=1, topk=1, verbose=True)
+nt = Ntac(data = adj_csr, labels =labels, lr=1, topk=1, verbose=True)
 
 # like the previous example, we can run the algorithm for a number of iterations
 num_iters = 15

@@ -1,4 +1,4 @@
-from ..seeded import SeededNtac
+# from ..seeded import SeededNtac
 from ..seeded.graph_data import FAFBData
 
 
@@ -19,14 +19,14 @@ def read_input(edges_file, types_file):
     return problem, data
 
 # Takes a Problem and a Data and returns an Ntac object
-def convert_to_nt(problem, partition, data):
-    labels = np.array(problem.match_refsol(partition).labels())
-    named_labels = np.array([ problem.cluster_names[labels[u]] for u in range(problem.numv) ])
-    nt = SeededNtac(data = data, labels = named_labels, lr=0.3, topk=1, verbose=True)
-    nt.partition = np.array([nt.label_mapping[x] for x in named_labels])
-    nt.embedding = problem.new_vectors(partition)
-    assert np.all(nt.get_partition() == named_labels)
-    return nt
+# def convert_to_nt(problem, partition, data):
+#     labels = np.array(problem.match_refsol(partition).labels())
+#     named_labels = np.array([ problem.cluster_names[labels[u]] for u in range(problem.numv) ])
+#     nt = SeededNtac(data = data, labels = named_labels, lr=0.3, topk=1, verbose=True)
+#     nt.partition = np.array([nt.label_mapping[x] for x in named_labels])
+#     nt.embedding = problem.new_vectors(partition)
+#     assert np.all(nt.get_partition() == named_labels)
+#     return nt
 
 # Takes a Data and returns a Problem
 def problem_from_data(data, name=""):
