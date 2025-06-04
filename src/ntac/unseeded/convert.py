@@ -32,19 +32,31 @@ def read_input(edges_file, types_file):
 def problem_from_data(data, name=""):
     coo = data.adj_csr.tocoo()
     edges = list(zip(coo.row, coo.col, coo.data))
-    label_map = {x:i for (i, x) in enumerate(data.unique_labels)}
-    label_names = data.unique_labels.copy()
-    if '?' in np.unique(data.ground_truth_partition):
-        assert not ('?' in label_names)
-        label_names = list(label_names) + ['?']
-        label_map['?'] = len(label_names) - 1
-    gt_labels = [ label_map[ data.ground_truth_partition[ u ] ] for u in range(data.n) ]
-    vertex_names = [ data.idx_to_node[u] for u in range(data.n) ]
-    problem = Problem([(vertex_names[u], vertex_names[v], w) for (u, v, w) in edges ], vertex_names, Partition(labels=gt_labels), name, data.unique_labels)
-    problem.A_ = data.adj_csr.astype(fp_type)                        # no need to recompute it, slow
-    problem.data = data
-    return problem
+    # label_map = {x:i for (i, x) in enumerate(data.unique_labels)}
+    # label_names = data.unique_labels.copy()
+    # if isinstance(data, FAFBData):
+    #     if '?' in np.unique(data.ground_truth_partition):
+    #         assert not ('?' in label_names)
+    #         label_names = list(label_names) + ['?']
+    #         label_map['?'] = len(label_names) - 1
+    #     gt_labels = [ label_map[ data.ground_truth_partition[ u ] ] for u in range(data.n) ]
 
+    #     vertex_names = [ data.idx_to_node[u] for u in range(data.n) ]
+    #     problem = Problem([(vertex_names[u], vertex_names[v], w) for (u, v, w) in edges ], vertex_names, Partition(labels=gt_labels), name, data.unique_labels)
+    #     problem.A_ = data.adj_csr.astype(fp_type)                        # no need to recompute it, slow
+    #     problem.data = data
+    # else:
+        # If no ground truth partition is available, we create a trivial partition
+    #get nodes fron edges
+    nodes = np.unique([str(u) for (u, _, _) in edges] + [str(v) for (_, v, _) in edges])
+    sorted_names = sorted(nodes, key=lambda x: (len(x), x))
+    #node_to_idx = {node: idx for idx, node in enumerate(sorted_names)}
+    vertex_names = sorted_names
+    problem = Problem([(vertex_names[u], vertex_names[v], w) for (u, v, w) in edges ], vertex_names, Partition(labels=[0]*data.n), name=name, cluster_names=["trivial_cluster"])
+    problem.A_ = data.adj_csr.astype(fp_type)                        # no need to recompute it, slow
+    problem.refsol = None
+        
+    return problem
 # Takes Ntac and Data and returns a Partition
 def partition_from_nt(nt, data):
     return Partition(labels=nt.partition)

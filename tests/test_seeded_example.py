@@ -1,3 +1,4 @@
+#%%
 import ntac
 import os
 from os.path import join
@@ -25,10 +26,10 @@ area = "ol_columnar"
 
 # below are some other areas:
 # area = "ol_intrinsic"
-# area = "ol_columnar"
+area = "ol_columnar"
 # area = "entire_visual_system"
 # area ="central_brain" 
-# area = "entire_brain"
+#area = "entire_brain"
 
 ignore_side = False
 if area == "central_brain" or area == "entire_brain":
@@ -59,16 +60,6 @@ train_indices, test_indices = data.test_train_split(train_size=0.05, sampling_ty
 #Artifically set test labels to "?"
 labels = data.labels.copy()
 labels[test_indices] = data.unlabeled_symbol
-
-
-
-nt = Ntac(data = data, labels = None, lr=1, topk=1, verbose=True)
-
-nt.solve_unseeded(max_k=10, max_iterations=5)
-final_partition = nt.get_partition()
-vis = ntac.Visualizer(nt, data)
-metrics = data.get_metrics(final_partition, test_indices, data.labels)
-vis.plot_acc_vs_class_size(metrics, test_indices=test_indices)
 
 
 
@@ -105,3 +96,4 @@ for i in range(num_iters):
 
 final_partition = nt.get_partition()
 print("Final partition for first 10 nodes:", final_partition[:10])
+# %%

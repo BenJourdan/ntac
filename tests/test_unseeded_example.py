@@ -1,8 +1,11 @@
+#%%
 import ntac
 from ntac import Ntac
 import os
 from os.path import join
 import numpy as np
+
+
 
 # first download the flywire data we'll need for this example. This will be cached in ~/.ntac/flywire_data
 ntac.download_flywire_data(verbose=True)
@@ -25,18 +28,22 @@ types_file = f"{data_path}/{side}_clusters.csv"
 data = ntac.seeded.FAFBData(edges_file=edges_file, types_file=types_file)
 
 
+#%%
 
-
-nt = Ntac(data = data, labels = None, verbose=True)
+labels = data.labels
+#set some of the labels to "?"
+labels[labels == "R7"] = "?"
+nt = Ntac(data = data, labels = labels, verbose=True)
 
 nt.solve_unseeded(
     max_k=5
 )
 
+#%%
 
 metrics = data.get_metrics(nt.get_partition(), np.array(range(data.n)), data.labels, compute_class_acc=True)
 print(f"Metrics: {metrics}")
-
+#%%
 vis = ntac.Visualizer(nt, data)
 vis.plot_class_accuracy(metrics)
 vis.plot_embedding_comparison("R7", "R8", show_error=False)
@@ -49,7 +56,7 @@ problematic_labels = [
     ]
 vis.plot_confusion_matrix(normalize=True, include_labels=problematic_labels)
 
-
+#%%
 # Now we show how to use ntac in the unseeded mode, where we start with an adjacency matrix and no labels.
 
 adj_matrix_csr = data.adj_csr
@@ -60,3 +67,6 @@ nt.solve_unseeded(
     max_k=5
 )
 partition = nt.get_partition()
+partition = data.map_partition_to_gt_labels(partition)
+metrics = data.get_metrics(partition, np.array(range(data.n)), data.labels, compute_class_acc=False)
+# %%

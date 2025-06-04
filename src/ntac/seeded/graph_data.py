@@ -5,8 +5,6 @@ from scipy.sparse import csr_matrix
 import numpy as np
 import random
 
-
-
 class GraphData:
     """
     Class for storing graph data and computing evaluation metrics.
@@ -38,8 +36,49 @@ class GraphData:
         self.unique_labels  = np.unique(self.labels[self.labeled_nodes])
 
 
+    def map_partition_to_gt_labels(self, partition):
+        """
+        Given:
+        - partition: 1D array of predicted labels (strings), length N
+        - self.labels:  1D array of ground-truth labels (strings), length N
+
+        This uses only util functions (labels2clusters, match_clusters, cluster_labels)
+        to align predicted clusters to ground-truth clusters and return a 1D array
+        of matched GT‐label strings.
+        """
+        import numpy as np
+        from ntac.unseeded.util import labels2clusters, match_clusters, cluster_labels
+
+        # 1) Encode predicted‐label strings → integer codes in [0..P−1]
+        pred_arr = np.asarray(partition, dtype=object)
+        pred_tokens, pred_inv = np.unique(pred_arr, return_inverse=True)
+        # Now pred_inv[i] is an integer in [0..P−1] for node i
+
+        # 2) Encode GT‐label strings → integer codes in [0..G−1]
+        gt_arr = np.asarray(self.labels, dtype=object)
+        gt_tokens, gt_inv = np.unique(gt_arr, return_inverse=True)
+        # Now gt_inv[i] is an integer in [0..G−1] for node i
+
+        # 3) Build list-of-clusters from those integer codes
+        clusters_pred = labels2clusters(pred_inv)
+        clusters_gt   = labels2clusters(gt_inv)
+
+        # 4) Run the matcher; C[j] = list of node‐indices from the predicted cluster
+        #    that best matches GT cluster j
+        C = match_clusters(clusters_pred, clusters_gt)
+
+        # 5) Flatten C back into an integer‐label array of length N, where each node u
+        #    gets assigned to GT‐cluster‐index j if u ∈ C[j]
+        matched_int = cluster_labels(C)
+        # matched_int[i] is now in [0..G−1]
+
+        # 6) Convert those ints back to the original GT‐strings
+        #    gt_tokens[j] is the string name of GT cluster j
+        return np.array(gt_tokens[matched_int], dtype=object)
+
  
-    def get_metrics(self, partition, indices, gt_labels):
+    def get_metrics(self, partition, indices, gt_labels, map_labels=False):
+        #TODO: make a pass and fix the doc strings at the end
         """
         Calculate evaluation metrics over the specified node indices.
         
@@ -56,6 +95,35 @@ class GraphData:
                   the corresponding computed scores as values.
         """
         metrics = {}
+        if not isinstance(partition, dict):
+            # If partition is not a dict, convert it to a dict with indices as keys
+            partition = {i: [(label, 1.0)] for i, label in enumerate(partition)}
+        top_k_partition = partition
+        #turn partition into a 1-D array by taking only the first label
+        partition = np.empty(self.n, dtype=object)
+        for i in range(self.n):
+            partition[i] = top_k_partition[i][0][0]
+
+        some_node = next(iter(top_k_partition))
+        K = len(top_k_partition[some_node])
+
+        topk_acc = {}
+        n_test = len(indices)
+
+        # for each k=1…K, count how many test‐nodes have the true label in their top‐k
+        for k in range(1, K+1):
+            correct = 0
+            for i in indices:
+                # get the first k predicted labels for node i
+                preds_i = [label for (label, _) in top_k_partition[i][:k]]
+                if gt_labels[i] in preds_i:
+                    correct += 1
+            topk_acc[k] = correct / n_test
+        metrics['topk_acc'] = topk_acc
+
+        #turn partition into a 1-D array by taking only the first label
+        partition = np.array([top_k_partition[i][0][0] for i in range(self.n)])
+        
         metrics["ari"] = adjusted_rand_score(gt_labels[indices], partition[indices])
         metrics["f1"] = f1_score(gt_labels[indices], partition[indices], average='weighted')
         metrics["acc"] = accuracy_score(gt_labels[indices], partition[indices])
@@ -213,62 +281,99 @@ class FAFBData(GraphData):
         super().__init__(self.adj_csr, self.ground_truth_partition)
 
     
+
     def get_metrics(self, partition, indices, gt_labels, compute_class_acc=False):
         """
-        Calculate evaluation metrics with additional per-region accuracy for FAFB data.
-        
-        In addition to computing overall metrics (ARI, F1, and accuracy) using the parent class method,
-        this method computes the accuracy for each region (if location information is available).
-        
+        Compute overall, top-k, region-level, and class-level accuracy metrics for FAFB data.
+
+        This function accepts either:
+        •  A “hard” partition as a 1-D array of length n (one label per node), or
+        •  A dict of the form {node_index: [(label₁, score₁), (label₂, score₂), …]} 
+            as returned by `nt.get_topk_partition(K)`.
+
         Parameters:
-            partition (np.array): Array of predicted labels for nodes.
-            indices (np.array): Node indices over which to compute the metrics.
-            gt_labels (np.array): Ground truth labels for the nodes.
-            compute_class_acc (bool): If True, compute accuracy for each class.
-        
+            partition (np.ndarray or dict):
+                - If an array of shape (n,), each entry is a single predicted label.
+                - If a dict mapping node_index → [(label₁, score₁), (label₂, score₂), …], this is
+                interpreted as a top-k ranking for each node.
+            indices (array-like of int):
+                The subset of node indices over which to evaluate metrics (e.g., test set indices).
+            gt_labels (np.ndarray of shape (n,)):
+                Ground-truth labels for all nodes.
+            compute_class_acc (bool, default=False):
+                If True, compute class-level top-k accuracy for each label in `self.unique_labels`.
+
         Returns:
-            dict: Dictionary containing overall metrics and a sub-dictionary 'region_acc' that maps regions
-                  to their computed accuracies.
-        
-        Note:
-            There is a redundant intersection operation (np.intersect1d) in the current implementation;
-            consider removing or updating it if its intent was different.
+            dict:
+                A dictionary containing:
+                - 'topk_acc': dict {k → overall accuracy@k for all `indices`}
+                - 'topk_region_acc' (if locations exist): dict {region → [acc@1, acc@2, …, acc@K]}
+                - 'region_acc': dict {region → accuracy@1}  (derived from topk_region_acc)
+                - 'topk_class_acc' (if compute_class_acc=True): dict {class_label → [acc@1, …, acc@K]}
+                - 'class_acc' (if compute_class_acc=True): dict {class_label → accuracy@1}
+                - plus any keys returned by `super().get_metrics(...)` (e.g., 'acc', 'ari', 'f1')
         """
-        #assert indices is array
+
         metrics = super().get_metrics(partition, indices, gt_labels)
-        if self.locations is not None:
+        if not isinstance(partition, dict):
+            # If partition is not a dict, convert it to a dict with indices as keys
+            partition = {i: [(label, 1.0)] for i, label in enumerate(partition)}
+        top_k_partition = partition
+        #turn partition into a 1-D array by taking only the first label
+        partition = np.empty(self.n, dtype=object)
+        for i in range(self.n):
+            partition[i] = top_k_partition[i][0][0]
+
+        some_node = next(iter(top_k_partition))
+        K = len(top_k_partition[some_node])
+
+
+        #compute top_k_region_acc
+        if self.locations is not None and not all(loc is None for loc in self.locations):
             region_groups = {}
             for i in indices:
                 region = self.locations[i] if self.locations is not None else "unknown"
                 region_groups.setdefault(region, []).append(i)
 
-            region_acc = {}
+            top_k_region_acc = {}
             for region, reg_indices in region_groups.items():
-                if len(reg_indices) == 0:
-                    region_acc[region] = -1
-                    continue
-                region_acc[region] = accuracy_score(gt_labels[reg_indices], partition[reg_indices])
-            metrics['region_acc'] = region_acc
-        
+                top_k_region_acc[region] = []
+                for k in range(1, K+1):
+                    correct = 0
+                    for i in reg_indices:
+                        preds_i = [pred[0] for pred in top_k_partition[i][:k]]
+                        if gt_labels[i] in preds_i:
+                            correct += 1
+                    if len(reg_indices) == 0:
+                        top_k_region_acc[region].append(np.nan)
+                    else:
+                        top_k_region_acc[region].append(correct / len(reg_indices))
+                    
+            metrics['topk_region_acc'] = top_k_region_acc
+            metrics['region_acc'] = {k: v[0] for k, v in metrics['topk_region_acc'].items()}
+
+        #compute top_k_class_acc (similar to region_acc)
         if compute_class_acc:
-            # Compute accuracy for each class
             class_acc = {}
             for label in self.unique_labels:
-                mask = (gt_labels[indices] == label)
-                idxs = indices[np.where(mask)[0]]
-                if idxs.size > 0:
-                    class_acc[label] = accuracy_score(
-                        gt_labels[idxs], partition[idxs]
-                    )
-                else:
-                    class_acc[label] = np.nan
-                # indices = np.where(gt_labels == label)[0]
-                # if len(indices) > 0:
-                #     class_acc[label] = accuracy_score(gt_labels[indices], partition[indices])
-                # else:
-                #     class_acc[label] = -1
-            metrics['class_acc'] = class_acc
+                class_acc[label] = []
+                for k in range(1, K+1):
+                    correct = 0
+                    for i in indices:
+                        preds_i = [pred[0] for pred in top_k_partition[i][:k]]
+                        if gt_labels[i] == label and gt_labels[i] in preds_i:
+                            correct += 1
+                    if len(indices) == 0:
+                        print(f"Warning: no indices for class {label} in top_k_class_acc")
+                        class_acc[label].append(np.nan)
+                    else:
+                        class_acc[label].append(correct / len(indices))
+            metrics['topk_class_acc'] = class_acc
+            metrics['class_acc'] = {k: v[0] for k, v in metrics['topk_class_acc'].items()}
+        
+
         return metrics
+
 
     #TODO: make the file format for BANC and FAFB the same and change accordingly
     def load_graph_and_partition(self):

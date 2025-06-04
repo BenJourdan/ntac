@@ -54,7 +54,8 @@ class SeededNtac:
         self.k = len(valid_labels)
         self.reverse_mapping = {new: old for old, new in label_mapping.items()}
         self.labels = np.array([label_mapping[p] if p != data.unlabeled_symbol else -1 for p in labels])
-       
+        self.similarity_matrix_to_frozen = None
+    
 
     def solve_unseeded(self, max_k, center_size=5, output_name=None, info_step=1, max_iterations=12, frac_seeds=0.1, chunk_size=6000):
         partition = None # forcing to None for now, because I dont want to expose the Partition class to the user. Can add later
@@ -62,11 +63,17 @@ class SeededNtac:
         #this crashes when some of the labels are "?"
         best_partition, last_partition, best_history = unseeded.solve_unseeded(problem, max_k, partition, center_size, output_name, info_step, max_iterations, frac_seeds, chunk_size)
         partition = best_partition
-        labels = np.array(problem.match_refsol(partition).labels())
-        # we need to see how we do this when we don't actually get labels in the problem
-        named_labels = np.array([ problem.cluster_names[labels[u]] for u in range(problem.numv) ])
-        self.partition = np.array([self.label_mapping[x] for x in named_labels])
+        # if self.k> 0:
+        #     labels = np.array(problem.match_refsol(partition).labels())
+        #     # we need to see how we do this when we don't actually get labels in the problem
+        #     named_labels = np.array([ problem.cluster_names[labels[u]] for u in range(problem.numv) ])
+        #     self.partition = np.array([self.label_mapping[x] for x in named_labels])
+        # else:
+        self.partition = partition.labels()
+        self.solved_unseeded = True
+        self.initialized = False
         self.embedding = problem.new_vectors(partition)
+        #TODO: add top5 partition here
    
     def initialize(self):
         """
@@ -77,7 +84,7 @@ class SeededNtac:
         """
         if self.initialized:
             return
-        
+        self.solved_unseeded = False
         self.time_spent_on_embedding = 0.0
         self.time_spent_on_sim_matrix = 0.0
         self.time_spent_on_partition = 0.0
@@ -555,6 +562,9 @@ class SeededNtac:
         Returns:
             np.ndarray: Array of labels corresponding to the current partition.
         """
+        if self.solved_unseeded:
+            # If the unseeded problem was solved, return the partition directly
+            return self.partition
         return np.array([self.reverse_mapping[p] for p in self.partition])
 
 
@@ -658,12 +668,15 @@ class SeededNtac:
             Dict[int, List[Tuple[label, float]]]: A dictionary where each key is a node index (0…n-1)
             and each value is a list of `k` tuples `(original_label, similarity_score)`, sorted by descending score.
         """
-
+        if self.solved_unseeded:
+            exception_msg = "Cannot call get_topk_partition() after solving the unseeded problem. Use get_partition() instead."
+            raise RuntimeError(exception_msg)
         # Ensure class pointers are built
         if not hasattr(self, "_fro_cols"):
             self.build_class_ptrs()
 
         # Cast similarity matrix to float32 for the Numba kernel
+
         sim = self.similarity_matrix_to_frozen.astype(np.float32)
 
         # Run the Numba kernel: returns (n × topk) arrays of class‐indices and their max‐similarity scores
@@ -683,6 +696,9 @@ class SeededNtac:
             tuples = []
             for j in range(k):
                 num_label = int(topk_inds[i, j])
+                if self.solve_unseeded:
+                    # If the unseeded problem was solved, we can directly use the partition
+                    original_label = num_label
                 original_label = self.reverse_mapping[num_label]
                 score = float(topk_vals[i, j])
                 tuples.append((original_label, score))
