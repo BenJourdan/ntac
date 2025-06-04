@@ -41,7 +41,10 @@ nt.solve_unseeded(
 
 #%%
 
-metrics = data.get_metrics(nt.get_partition(), np.array(range(data.n)), data.labels, compute_class_acc=True)
+
+nt.map_partition_to_gt_labels(data.labels)
+partition = nt.get_partition()
+metrics = data.get_metrics(partition, np.array(range(data.n)), data.labels, compute_class_acc=True)
 print(f"Metrics: {metrics}")
 #%%
 vis = ntac.Visualizer(nt, data)
@@ -66,7 +69,7 @@ nt = Ntac(data = adj_matrix_csr, labels = None, verbose=True)
 nt.solve_unseeded(
     max_k=5
 )
+
 partition = nt.get_partition()
-partition = data.map_partition_to_gt_labels(partition)
-metrics = data.get_metrics(partition, np.array(range(data.n)), data.labels, compute_class_acc=False)
+print(f"Partition: {partition[:10]}")
 # %%

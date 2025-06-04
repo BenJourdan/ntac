@@ -5,7 +5,7 @@ Neuronal Type Assignment with Connectivity
 
 ## dev tips:
 
-install uv:
+install pixi:
 `curl -fsSL https://pixi.sh/install.sh | bash`
 
 ## examples

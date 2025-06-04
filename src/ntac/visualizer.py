@@ -224,6 +224,10 @@ class Visualizer:
         indices1 = np.where(partition == class_name1)[0] if class_name1 else np.array([])
         indices2 = np.where(partition == class_name2)[0] if class_name2 else np.array([])
 
+
+        unique_classes = set(partition)
+        print(unique_classes)
+
         if len(indices1) == 0 and len(indices2) == 0:
             raise ValueError("No neurons found for the given class names.")
 

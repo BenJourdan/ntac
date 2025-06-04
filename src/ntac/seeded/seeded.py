@@ -705,3 +705,45 @@ class SeededNtac:
             result[i] = tuples
 
         return result
+
+
+    def map_partition_to_gt_labels(self, gt_labels):
+        #TODO: fix docstring
+        """
+        Given:
+        - partition: 1D array of predicted labels (strings), length N
+        - self.labels:  1D array of ground-truth labels (strings), length N
+
+        This uses only util functions (labels2clusters, match_clusters, cluster_labels)
+        to align predicted clusters to ground-truth clusters and return a 1D array
+        of matched GT‐label strings.
+        """
+
+        from ntac.unseeded.util import labels2clusters, match_clusters, cluster_labels
+
+        # 1) Encode predicted‐label strings → integer codes in [0..P−1]
+        pred_arr = np.asarray(self.partition, dtype=object)
+        pred_tokens, pred_inv = np.unique(pred_arr, return_inverse=True)
+        # Now pred_inv[i] is an integer in [0..P−1] for node i
+
+        # 2) Encode GT‐label strings → integer codes in [0..G−1]
+        gt_arr = np.asarray(gt_labels, dtype=object)
+        gt_tokens, gt_inv = np.unique(gt_arr, return_inverse=True)
+        # Now gt_inv[i] is an integer in [0..G−1] for node i
+
+        # 3) Build list-of-clusters from those integer codes
+        clusters_pred = labels2clusters(pred_inv)
+        clusters_gt   = labels2clusters(gt_inv)
+
+        # 4) Run the matcher; C[j] = list of node‐indices from the predicted cluster
+        #    that best matches GT cluster j
+        C = match_clusters(clusters_pred, clusters_gt)
+
+        # 5) Flatten C back into an integer‐label array of length N, where each node u
+        #    gets assigned to GT‐cluster‐index j if u ∈ C[j]
+        matched_int = cluster_labels(C)
+        # matched_int[i] is now in [0..G−1]
+
+        # 6) Convert those ints back to the original GT‐strings
+        #    gt_tokens[j] is the string name of GT cluster j
+        self.partition = np.array(gt_tokens[matched_int], dtype=object)

@@ -35,47 +35,6 @@ class GraphData:
         #self.unique_labels = np.unique(self.labels)
         self.unique_labels  = np.unique(self.labels[self.labeled_nodes])
 
-
-    def map_partition_to_gt_labels(self, partition):
-        """
-        Given:
-        - partition: 1D array of predicted labels (strings), length N
-        - self.labels:  1D array of ground-truth labels (strings), length N
-
-        This uses only util functions (labels2clusters, match_clusters, cluster_labels)
-        to align predicted clusters to ground-truth clusters and return a 1D array
-        of matched GT‐label strings.
-        """
-        import numpy as np
-        from ntac.unseeded.util import labels2clusters, match_clusters, cluster_labels
-
-        # 1) Encode predicted‐label strings → integer codes in [0..P−1]
-        pred_arr = np.asarray(partition, dtype=object)
-        pred_tokens, pred_inv = np.unique(pred_arr, return_inverse=True)
-        # Now pred_inv[i] is an integer in [0..P−1] for node i
-
-        # 2) Encode GT‐label strings → integer codes in [0..G−1]
-        gt_arr = np.asarray(self.labels, dtype=object)
-        gt_tokens, gt_inv = np.unique(gt_arr, return_inverse=True)
-        # Now gt_inv[i] is an integer in [0..G−1] for node i
-
-        # 3) Build list-of-clusters from those integer codes
-        clusters_pred = labels2clusters(pred_inv)
-        clusters_gt   = labels2clusters(gt_inv)
-
-        # 4) Run the matcher; C[j] = list of node‐indices from the predicted cluster
-        #    that best matches GT cluster j
-        C = match_clusters(clusters_pred, clusters_gt)
-
-        # 5) Flatten C back into an integer‐label array of length N, where each node u
-        #    gets assigned to GT‐cluster‐index j if u ∈ C[j]
-        matched_int = cluster_labels(C)
-        # matched_int[i] is now in [0..G−1]
-
-        # 6) Convert those ints back to the original GT‐strings
-        #    gt_tokens[j] is the string name of GT cluster j
-        return np.array(gt_tokens[matched_int], dtype=object)
-
  
     def get_metrics(self, partition, indices, gt_labels, map_labels=False):
         #TODO: make a pass and fix the doc strings at the end
@@ -124,6 +83,10 @@ class GraphData:
         #turn partition into a 1-D array by taking only the first label
         partition = np.array([top_k_partition[i][0][0] for i in range(self.n)])
         
+        
+        print(gt_labels[indices])
+        print(partition[indices])
+
         metrics["ari"] = adjusted_rand_score(gt_labels[indices], partition[indices])
         metrics["f1"] = f1_score(gt_labels[indices], partition[indices], average='weighted')
         metrics["acc"] = accuracy_score(gt_labels[indices], partition[indices])
