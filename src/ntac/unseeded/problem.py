@@ -31,7 +31,7 @@ class Problem:
         self.sols_dir = "./sols/"
         self.seeded_method = 0
 
-        self.set_device(verbose=False)
+        self.set_device(verbose=True)
 
     def set_device(self, device="default", verbose=False):
         if device=="cpu" or not is_cuda_available():
