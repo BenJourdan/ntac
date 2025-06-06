@@ -32,9 +32,6 @@ class Partition:
         if self.clusters_ is None: self.clusters_ = labels2clusters(self.labels_)
         return self.clusters_
 
-    def match_refsol(self, refsol):
-        return Partition(clusters=match_clusters(refsol.clusters(), refsol.clusters()))
-
     def size(self):
         return len(self.clusters())
 
