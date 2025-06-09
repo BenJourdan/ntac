@@ -9,8 +9,6 @@ authors = [
 requires-python = ">=3.10"
 dependencies = [
     "bottleneck>=1.5.0",
-    "cuda-python>=12.9.0",
-    "cupy-cuda12x>=13.4.1",
     "matplotlib>=3.10.3",
     "numba>=0.61.0",
     "pandas>=2.2.3",
@@ -20,7 +18,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gpu = ["cuda-python>=12.9.0"]
+gpu = [
+    "cuda-python>=12.9.0",
+    "cupy-cuda12x>=13.4.1",
+    ]
 dev = [
     "black",
     "build",
@@ -53,18 +54,3 @@ testpaths = ["tests"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.pixi.workspace]
-channels = ["conda-forge"]
-platforms = ["linux-64", "win-64"]
-
-[tool.pixi.pypi-dependencies]
-ntac = { path = ".", editable = true }
-
-[tool.pixi.environments]
-default = { solve-group = "default" }
-dev = { features = ["dev"], solve-group = "default" }
-
-[tool.pixi.tasks]
-
-[tool.pixi.dependencies]
-#cudatoolkit = ">=11.8.0,<12"

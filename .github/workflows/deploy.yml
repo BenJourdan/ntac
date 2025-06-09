@@ -24,33 +24,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Micromamba
+        uses: mamba-org/setup-micromamba@v2
         with:
-          python-version: '3.11'
+          environment-name: ntac-env
+          create-args: python=3.11 pip
 
-      - name: Install uv
+      - name: Install project and optional dependencies
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Install dependencies
-        run: uv sync --all-extras
+          pip install -e ".[dev,gpu]"
 
       - name: Build distribution
         if: ${{ github.event.inputs.publish_pypi == 'true' }}
-        run: uv run python -m build
+        run: python -m build
 
       - name: Publish to PyPI
         if: ${{ github.event.inputs.publish_pypi == 'true' }}
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: uv run twine upload dist/*
+        run: twine upload dist/*
 
       - name: Build docs
         if: ${{ github.event.inputs.deploy_docs == 'true' }}
-        run: uv run sphinx-build -b html docs/source docs/build/html
+        run: sphinx-build -b html docs/source docs/build/html
 
       - name: Deploy docs to GitHub Pages
         if: ${{ github.event.inputs.deploy_docs == 'true' }}

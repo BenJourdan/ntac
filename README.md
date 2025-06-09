@@ -3,10 +3,19 @@ Neuronal Type Assignment with Connectivity
 
 
 
-## dev tips:
+## Installation:
 
-install pixi:
-`curl -fsSL https://pixi.sh/install.sh | bash`
+Install ntac with:
+`pip install ntac`
+
+
+Install cudatoolkit with conda for optional speed:
+`conda install -c conda-forge cudatoolkit`
+
+
+
+
+
 
 ## examples
 

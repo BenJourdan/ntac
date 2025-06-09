@@ -3,15 +3,40 @@ import numpy as np
 from numba import cuda, njit, prange
 from scipy.sparse import csr_matrix
 from .util import fp_type
+import subprocess
+
+import warnings
+from numba.core.errors import NumbaPerformanceWarning
+warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
 def is_cuda_available():
     """Check if CUDA is available on the system"""
+    return cuda.is_available() & validate_cuda_toolchain()
+
+def validate_cuda_toolchain():
+    from numba import cuda
+    import numpy as np
+    @cuda.jit
+    def dummy_kernel(x):
+        idx = cuda.grid(1)
+        if idx < x.size:
+            x[idx] += 1
     try:
-        # This will raise an exception if no CUDA device is available
-        device_count = cuda.gpus.lst
-        return len(device_count) > 0
-    except:
+        x = np.zeros(4, dtype=np.float32)
+        d_x = cuda.to_device(x)
+        dummy_kernel[1, 4](d_x)
+        d_x.copy_to_host()
+        return True
+    except cuda.cudadrv.driver.LinkerError as e:
+        print("CUDA driver is available, but PTX linking failed. ")
+        print("Make sure you've installed a compatible version of `cudatoolkit`.")
+        print("Using conda, you can install it with:")
+        print("install -c conda-forge cudatoolkit")
         return False
+    except cuda.cudadrv.error.CudaSupportError as e:
+        raise RuntimeError("CUDA support error — possibly missing cudatoolkit or incompatible driver.") from e
+    except Exception as e:
+        raise RuntimeError("Unexpected error during CUDA test kernel execution.") from e
 
 # 1) The CUDA kernel: one thread per (u,i) pair
 @cuda.jit
