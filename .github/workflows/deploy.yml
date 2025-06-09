@@ -34,10 +34,21 @@ jobs:
         run: |
           pip install -e ".[dev,gpu]"
 
+      - name: Clean old build files
+        run: rm -rf dist build *.egg-info
+
+      - name: Upgrade build tools
+        run: |
+          pip install --upgrade pip
+          pip install --upgrade build hatchling
+
       - name: Build distribution
         if: ${{ github.event.inputs.publish_pypi == 'true' }}
         run: python -m build
 
+      - name: Check distribution metadata
+        run: twine check dist/*
+      
       - name: Publish to PyPI
         if: ${{ github.event.inputs.publish_pypi == 'true' }}
         env:
