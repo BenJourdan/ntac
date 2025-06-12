@@ -47,6 +47,7 @@ jobs:
         run: python -m build
 
       - name: Check distribution metadata
+        if: ${{ github.event.inputs.publish_pypi == 'true' }}
         run: twine check dist/*
       
       - name: Publish to PyPI
