@@ -1,2 +1,1 @@
-from . seeded import SeededNtac
-from . graph_data import FAFBData, GraphData
+from . seeded import Ntac

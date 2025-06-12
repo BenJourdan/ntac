@@ -1,0 +1,18 @@
+@media (min-width: 768px) {
+  .article-container {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Remove fixed max-width on the article itself */
+  article#furo-main-content {
+    max-width: 100%;  /* allow it to inherit width from .article-container */
+  }
+
+  /* Make <pre> blocks scroll horizontally instead of wrapping */
+  pre {
+    white-space: pre;
+    overflow-x: auto;
+  }
+}

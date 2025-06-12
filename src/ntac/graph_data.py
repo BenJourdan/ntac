@@ -28,7 +28,7 @@ class GraphData:
         """
         self.adj_csr = adj_csr
         self.adj_csc = adj_csr.tocsc()
-        self.labels = labels
+        self.labels = labels.copy()
         self.n = adj_csr.shape[0]
         self.unlabeled_symbol = "?"
         self.labeled_nodes = np.where(self.labels != self.unlabeled_symbol)[0]
@@ -40,18 +40,27 @@ class GraphData:
         #TODO: make a pass and fix the doc strings at the end
         """
         Calculate evaluation metrics over the specified node indices.
-        
-        Computes the Adjusted Rand Index (ARI), macro F1 score, and accuracy 
+
+        Computes the Adjusted Rand Index (ARI), macro F1 score, and accuracy
         comparing the given partition against the ground truth labels.
-        
-        Parameters:
-            partition (np.array): Array of predicted labels for each node.
-            indices (np.array): Indices of the nodes to evaluate.
-            gt_labels (np.array): Array of ground truth labels for nodes.
-        
-        Returns:
-            dict: A dictionary with metric names as keys ('ari', 'f1', 'acc') and 
-                  the corresponding computed scores as values.
+
+        Parameters
+        ----------
+        partition : np.array
+            Array of predicted labels for each node.
+        indices : np.array
+            Indices of the nodes to evaluate.
+        gt_labels : np.array
+            Array of ground truth labels for nodes.
+
+        Returns
+        -------
+        dict
+            A dictionary with metric names as keys and the corresponding scores:
+
+            - `'ari'`: Adjusted Rand Index
+            - `'f1'`: macro F1 score
+            - `'acc'`: classification accuracy
         """
         metrics = {}
         if not isinstance(partition, dict):
@@ -82,10 +91,7 @@ class GraphData:
 
         #turn partition into a 1-D array by taking only the first label
         partition = np.array([top_k_partition[i][0][0] for i in range(self.n)])
-        
-        
-        print(gt_labels[indices])
-        print(partition[indices])
+    
 
         metrics["ari"] = adjusted_rand_score(gt_labels[indices], partition[indices])
         metrics["f1"] = f1_score(gt_labels[indices], partition[indices], average='weighted')
@@ -96,24 +102,32 @@ class GraphData:
  
     def test_train_split(self, train_size=0.1, sampling_type="at_least_one_per_class",  random_seed=None):
         """
-        Splits the labeled nodes into training and test sets using various sampling strategies.
-        
-        Parameters:
-            train_size (float or int): If < 1, the fraction of total labeled nodes to use as training;
-                                    if >= 1, the absolute number of training samples.
-            sampling_type (str): Type of sampling to use. Options:
-                                - "uniform": random sampling from all labeled nodes.
-                                - "at_least_one_per_class": ensure at least one sample per class,
-                                    then randomly fill the remaining slots. This will exceed train_size when 
-                                    required to satisfy the class constraint.
-                                - "exactly_k_per_class": sample exactly 'train_size' nodes per class.
-                                - "stratified": sample nodes so that the class distribution in the training
-                                    set mirrors the overall distribution.
-            num_per_class (int, optional): Number of samples per class for "exactly_k_per_class" mode.
-        
-        Returns:
-            train_set (np.array): Array of indices for training nodes.
-            test_set (np.array): Array of indices for test nodes.
+        Split the labeled nodes into training and test sets using various sampling strategies.
+
+        Parameters
+        ----------
+        train_size : float or int
+            If < 1, the fraction of total labeled nodes to use as training;
+            if ≥ 1, the absolute number of training samples.
+        sampling_type : str
+            Type of sampling to use. One of:
+            - `"uniform"`: Random sampling from all labeled nodes.
+            - `"at_least_one_per_class"`: Ensure at least one sample per class,
+            then randomly fill the remaining slots. This may exceed `train_size`
+            if needed to satisfy the class constraint.
+            - `"exactly_k_per_class"`: Sample exactly `train_size` nodes per class.
+            - `"stratified"`: Sample nodes so that the class distribution in the
+            training set mirrors the overall distribution.
+
+        num_per_class : int, optional
+            Number of samples per class, used only in `"exactly_k_per_class"` mode.
+
+        Returns
+        -------
+        train_set : np.ndarray
+            Array of indices for training nodes.
+        test_set : np.ndarray
+            Array of indices for test nodes.
         """
         if random_seed is not None:
             random.seed(random_seed)
@@ -250,31 +264,35 @@ class FAFBData(GraphData):
         Compute overall, top-k, region-level, and class-level accuracy metrics for FAFB data.
 
         This function accepts either:
-        •  A “hard” partition as a 1-D array of length n (one label per node), or
-        •  A dict of the form {node_index: [(label₁, score₁), (label₂, score₂), …]} 
-            as returned by `nt.get_topk_partition(K)`.
+        - A “hard” partition as a 1-D array of length n (one label per node), or
+        - A dictionary of the form `{node_index: [(label₁, score₁), (label₂, score₂), …]}`,
+        as returned by `nt.get_topk_partition(K)`.
 
-        Parameters:
-            partition (np.ndarray or dict):
-                - If an array of shape (n,), each entry is a single predicted label.
-                - If a dict mapping node_index → [(label₁, score₁), (label₂, score₂), …], this is
-                interpreted as a top-k ranking for each node.
-            indices (array-like of int):
-                The subset of node indices over which to evaluate metrics (e.g., test set indices).
-            gt_labels (np.ndarray of shape (n,)):
-                Ground-truth labels for all nodes.
-            compute_class_acc (bool, default=False):
-                If True, compute class-level top-k accuracy for each label in `self.unique_labels`.
+        Parameters
+        ----------
+        partition : np.ndarray or dict
+            If an array of shape (n,), each entry is a single predicted label.
+            If a dict mapping node_index to a list of (label, score) pairs, this is interpreted
+            as a top-k ranking for each node.
+        indices : array-like of int
+            Subset of node indices over which to evaluate metrics (e.g., test set indices).
+        gt_labels : np.ndarray of shape (n,)
+            Ground-truth labels for all nodes.
+        compute_class_acc : bool, optional
+            If True, compute class-level top-k accuracy for each label in `self.unique_labels`.
+            Default is False.
 
-        Returns:
-            dict:
-                A dictionary containing:
-                - 'topk_acc': dict {k → overall accuracy@k for all `indices`}
-                - 'topk_region_acc' (if locations exist): dict {region → [acc@1, acc@2, …, acc@K]}
-                - 'region_acc': dict {region → accuracy@1}  (derived from topk_region_acc)
-                - 'topk_class_acc' (if compute_class_acc=True): dict {class_label → [acc@1, …, acc@K]}
-                - 'class_acc' (if compute_class_acc=True): dict {class_label → accuracy@1}
-                - plus any keys returned by `super().get_metrics(...)` (e.g., 'acc', 'ari', 'f1')
+        Returns
+        -------
+        dict
+            A dictionary containing:
+
+            - `'topk_acc'`: dict mapping k → overall accuracy@k over `indices`.
+            - `'topk_region_acc'`: dict mapping region → list of [acc@1, acc@2, ..., acc@K] (if locations exist).
+            - `'region_acc'`: dict mapping region → accuracy@1 (derived from `topk_region_acc`).
+            - `'topk_class_acc'`: dict mapping class_label → [acc@1, ..., acc@K] (if `compute_class_acc=True`).
+            - `'class_acc'`: dict mapping class_label → accuracy@1 (if `compute_class_acc=True`).
+            - Any additional keys returned by `super().get_metrics(...)`, such as `'acc'`, `'ari'`, or `'f1'`.
         """
 
         metrics = super().get_metrics(partition, indices, gt_labels)

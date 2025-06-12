@@ -1,5 +1,5 @@
 # from ..seeded import SeededNtac
-from ..seeded.graph_data import FAFBData
+from ..graph_data import FAFBData
 
 
 from .problem import Problem

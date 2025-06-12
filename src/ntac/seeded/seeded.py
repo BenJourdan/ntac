@@ -3,11 +3,26 @@ import numpy as np
 import time
 from numba import njit, prange
 import scipy.sparse as sp
-from .graph_data import GraphData
+from ..graph_data import GraphData
 
 from .. import unseeded
 
-class SeededNtac:
+import sys, os
+from contextlib import contextmanager
+
+@contextmanager
+def _suppress_stdout():
+    """Suppress prints inside the with-block."""
+    devnull = open(os.devnull, 'w')
+    old_stdout = sys.stdout
+    sys.stdout = devnull
+    try:
+        yield
+    finally:
+        sys.stdout = old_stdout
+        devnull.close()
+
+class Ntac:
     def __init__(self, data, labels = None, lr=0.3, topk=1, verbose=False):
         """
         Initialize the supervised ntac model.
@@ -36,7 +51,6 @@ class SeededNtac:
         else:
             assert isinstance(data, GraphData), type_error
             if labels is None:
-                print("labels not provided, using data.labels")
                 labels = data.labels
 
         self.data = data
@@ -61,7 +75,11 @@ class SeededNtac:
         partition = None # forcing to None for now, because I dont want to expose the Partition class to the user. Can add later
         problem = unseeded.convert.problem_from_data(self.data) #move to init?
         #this crashes when some of the labels are "?"
-        best_partition, last_partition, best_history = unseeded.solve_unseeded(problem, max_k, partition, center_size, output_name, info_step, max_iterations, frac_seeds, chunk_size)
+        if self.verbose:
+            best_partition, last_partition, best_history = unseeded.solve_unseeded(problem, max_k, partition, center_size, output_name, info_step, max_iterations, frac_seeds, chunk_size)
+        else:
+            with _suppress_stdout():
+                best_partition, last_partition, best_history = unseeded.solve_unseeded(problem, max_k, partition, center_size, output_name, info_step, max_iterations, frac_seeds, chunk_size)
         partition = best_partition
         # if self.k> 0:
         #     labels = np.array(problem.match_refsol(partition).labels())
@@ -75,7 +93,7 @@ class SeededNtac:
         self.embedding = problem.new_vectors(partition)
         #TODO: add top5 partition here
    
-    def initialize(self):
+    def _initialize(self):
         """
         Initializes internal variables and computes the initial embedding, similarity matrix, and partition.
         
@@ -98,8 +116,8 @@ class SeededNtac:
         csr_data = data.adj_csr.data
 
         # Precompute reverse mappings for incremental updates:
-        self.pre_out_indptr, self.pre_out_indices, self.pre_out_data = self.compute_reverse_mapping(csr_indptr, csr_indices, csr_data,data.n)
-        self.pre_in_indptr, self.pre_in_indices, self.pre_in_data   = self.compute_reverse_mapping(csc_indptr, csc_indices, csc_data, data.n)
+        self.pre_out_indptr, self.pre_out_indices, self.pre_out_data = self._compute_reverse_mapping(csr_indptr, csr_indices, csr_data,data.n)
+        self.pre_in_indptr, self.pre_in_indices, self.pre_in_data   = self._compute_reverse_mapping(csc_indptr, csc_indices, csc_data, data.n)
 
         partition = np.zeros(data.n, dtype=int)
         #set frozen nodes to their labels
@@ -115,10 +133,10 @@ class SeededNtac:
        
         partition[frozen_indices] = frozen_partition
         #_t = time.time()
-        self.embedding = self.generate_embedding(csr_indptr, csr_indices, csr_data, csc_indptr, csc_indices, csc_data, partition, self.k)
+        self.embedding = self._generate_embedding(csr_indptr, csr_indices, csr_data, csc_indptr, csc_indices, csc_data, partition, self.k)
         #self.time_spent_on_embedding += time.time() - _t
         #_t = time.time()
-        self.similarity_matrix_to_frozen = self.generate_similarity_matrix_to_frozen(self.embedding, frozen_indices)
+        self.similarity_matrix_to_frozen = self._generate_similarity_matrix_to_frozen(self.embedding, frozen_indices)
         #self.time_spent_on_sim_matrix += time.time() - _t
         
         
@@ -130,7 +148,7 @@ class SeededNtac:
 
     @staticmethod
     @njit(parallel=True)
-    def compute_similarity_matrix_sparse_inverted(emb_data, emb_indices, emb_indptr,
+    def _compute_similarity_matrix_sparse_inverted(emb_data, emb_indices, emb_indptr,
                                                     fro_data, fro_indices, fro_indptr,
                                                     row_sum, fro_row_sum,
                                                     N, M, D, tol=1e-9):
@@ -190,7 +208,7 @@ class SeededNtac:
 
 
 
-    def generate_similarity_matrix_to_frozen(self, embeddings, frozen_indices):
+    def _generate_similarity_matrix_to_frozen(self, embeddings, frozen_indices):
         """
         Generate the similarity matrix between all embeddings and the frozen embeddings.
         
@@ -236,7 +254,7 @@ class SeededNtac:
             fro_row_sum[i] = frozen_sparse[i].sum()
         
         # Call the inverted-index Numba kernel.
-        sim_matrix = self.compute_similarity_matrix_sparse_inverted(
+        sim_matrix = self._compute_similarity_matrix_sparse_inverted(
             emb_data, emb_indices, emb_indptr,
             fro_data, fro_indices, fro_indptr,
             row_sum, fro_row_sum,
@@ -249,7 +267,7 @@ class SeededNtac:
 
     @staticmethod
     @njit(parallel=True)
-    def generate_embedding(csr_indptr, csr_indices,csr_data, csc_indptr, csc_indices, csc_data,
+    def _generate_embedding(csr_indptr, csr_indices,csr_data, csc_indptr, csc_indices, csc_data,
                                 partition, k):
         """
         Create a 2k-dimensional embedding per vertex.
@@ -288,7 +306,7 @@ class SeededNtac:
 
     @staticmethod
     @njit
-    def topk_indices(similarities, k):
+    def _topk_indices(similarities, k):
         """
         Returns the indices of the top k elements in `similarities` in descending order.
         
@@ -337,7 +355,7 @@ class SeededNtac:
 
 
 
-    def compute_partition_from_frozen(self, frozen_indices, frozen_partition, similarity_matrix_to_frozen):
+    def _compute_partition_from_frozen(self, frozen_indices, frozen_partition, similarity_matrix_to_frozen):
         """
         Computes a partition for non-frozen points based on the top-k closest frozen points.
         
@@ -370,7 +388,7 @@ class SeededNtac:
                 partition[idx] = partition[closest_frozen_point]
             else:
                 # Get indices of the top c closest frozen points
-                top_c_indices = self.topk_indices(similarities, self.topk)#np.argsort(similarities)[-c:][::-1]  # Descending order
+                top_c_indices = self._topk_indices(similarities, self.topk)#np.argsort(similarities)[-c:][::-1]  # Descending order
 
                 # Get the labels of these top c frozen points
                 top_c_labels = frozen_partition[top_c_indices]
@@ -392,7 +410,7 @@ class SeededNtac:
 
 
 
-    def compute_reverse_mapping(self, csr_indptr, csr_indices, csr_data, n):
+    def _compute_reverse_mapping(self, csr_indptr, csr_indices, csr_data, n):
         """
         Computes the reverse mapping for a sparse matrix.
         
@@ -444,7 +462,7 @@ class SeededNtac:
 
     @staticmethod
     @njit#(parallel=True)#surprisingly, this is function is faster without parallelization
-    def incremental_embedding_update(embedding, 
+    def _incremental_embedding_update(embedding, 
                                     pre_in_indptr, pre_in_indices, pre_in_data,
                                     pre_out_indptr, pre_out_indices, pre_out_data,
                                     old_partition, new_partition, 
@@ -504,7 +522,7 @@ class SeededNtac:
 
     def step(self):
         """
-        Performs one step of the ntac algorithm.
+        Performs one step of the seeded ntac algorithm.
         
         This includes:
             1. Updating the partition from the similarity matrix.
@@ -515,10 +533,10 @@ class SeededNtac:
         Also updates internal timing metrics for different operations.
         """
         if not self.initialized:
-            self.initialize()
+            self._initialize()
         _t = time.time()
         old_partition = self.partition.copy()
-        self.partition = self.compute_partition_from_frozen(self.frozen_indices, self.frozen_partition, self.similarity_matrix_to_frozen)
+        self.partition = self._compute_partition_from_frozen(self.frozen_indices, self.frozen_partition, self.similarity_matrix_to_frozen)
 
         changed_nodes = np.nonzero(self.partition != old_partition)[0]
         # print("Percentage of nodes that changed partition: ", changed_nodes.size / len(partition))
@@ -531,7 +549,7 @@ class SeededNtac:
         #                                 self.data.adj_csc.indptr, self.data.adj_csc.indices, self.data.adj_csc.data,
         #                                 self.partition, self.k)
         if changed_nodes.size > 0:
-            self.incremental_embedding_update(self.last_embedding, 
+            self._incremental_embedding_update(self.last_embedding, 
                             self.pre_in_indptr, self.pre_in_indices, self.pre_in_data,
                             self.pre_out_indptr, self.pre_out_indices, self.pre_out_data,
                             old_partition, self.partition, 
@@ -542,7 +560,7 @@ class SeededNtac:
         self.time_spent_on_embedding += time.time() - _t
         
         _t = time.time()
-        self.similarity_matrix_to_frozen = self.generate_similarity_matrix_to_frozen(self.embedding, self.frozen_indices)
+        self.similarity_matrix_to_frozen = self._generate_similarity_matrix_to_frozen(self.embedding, self.frozen_indices)
         self.time_spent_on_sim_matrix += time.time() - _t
 
         if self.verbose:
@@ -562,14 +580,19 @@ class SeededNtac:
         Returns:
             np.ndarray: Array of labels corresponding to the current partition.
         """
+       
         if self.solved_unseeded:
             # If the unseeded problem was solved, return the partition directly
-            return self.partition
+            
+            return np.array([str(p) for p in self.partition])
+        if not self.initialized:
+            #throw an erroe asking the use to run the alg first
+            raise RuntimeError("Need to run at least one step or call solve_unseeded() before getting the partition.")
         return np.array([self.reverse_mapping[p] for p in self.partition])
 
 
 
-    def build_class_ptrs(self):
+    def _build_class_ptrs(self):
         """
         Build flattened arrays mapping each class to its frozen-column indices in the similarity matrix.
         Populates:
@@ -671,16 +694,19 @@ class SeededNtac:
         if self.solved_unseeded:
             exception_msg = "Cannot call get_topk_partition() after solving the unseeded problem. Use get_partition() instead."
             raise RuntimeError(exception_msg)
+        if not self.initialized:
+            #throw an erroe asking the use to run the alg first
+            raise RuntimeError("Need to run at least one step before getting the partition.")
         # Ensure class pointers are built
         if not hasattr(self, "_fro_cols"):
-            self.build_class_ptrs()
+            self._build_class_ptrs()
 
         # Cast similarity matrix to float32 for the Numba kernel
 
         sim = self.similarity_matrix_to_frozen.astype(np.float32)
 
         # Run the Numba kernel: returns (n × topk) arrays of class‐indices and their max‐similarity scores
-        topk_inds, topk_vals = SeededNtac._topk_njit(
+        topk_inds, topk_vals = Ntac._topk_njit(
             sim,
             self._fro_cols,
             self._fro_ptr,
