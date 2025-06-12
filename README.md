@@ -1,4 +1,4 @@
-# NTAC  <img src="assets//logo.png" align="right" height="100" />
+# NTAC  <img src="assets//logo.png" align="right" height="100" alt="Designed by Haruka Udo" />
 
 <div style="margin-top: 30px;"></div>
 
