@@ -3,13 +3,14 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Seeded NTAC example" href="seeded_example.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
         <title>ntac documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=302659d7" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=66f80225" />
     
     
 
@@ -198,7 +199,12 @@
   <input type="hidden" name="area" value="default">
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
-  
+  <ul>
+<li class="toctree-l1"><a class="reference internal" href="seeded_example.html">Seeded NTAC example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="unseeded_example.html">Unseeded NTAC example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+</ul>
+
 </div>
 </div>
 
@@ -238,10 +244,79 @@
         </div>
         <article role="main" id="furo-main-content">
           <section id="ntac-documentation">
-<h1>ntac documentation<a class="headerlink" href="#ntac-documentation" title="Link to this heading">¶</a></h1>
-<p>Add your content using <code class="docutils literal notranslate"><span class="pre">reStructuredText</span></code> syntax. See the
-<a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html">reStructuredText</a>
-documentation for details.</p>
+<h1>NTAC documentation<a class="headerlink" href="#ntac-documentation" title="Link to this heading">¶</a></h1>
+<p>This is a Python implementation of the Neuronal typing algorithm described in</p>
+<p><a class="reference external" href="https://www.biorxiv.org/content/10.1101/2025.06.11.659184v1">Gregory Schwartzman, Ben Jourdan, David García-Soriano, Arie Matsliah. Connectivity Is All You Need: Inferring Neuronal Types with NTAC. bioRxiv. 2025</a></p>
+<p>NTAC (Neuronal Type Assignment from Connectivity) groups neurons into cell types based solely on synaptic connectivity. It comes in two variants:</p>
+<ul class="simple">
+<li><p><strong>Seeded (semi-supervised):</strong> Requires a small fraction of neurons with known labels.</p></li>
+<li><p><strong>Unseeded (unsupervised):</strong> Requires no labels.</p></li>
+</ul>
+</section>
+<section id="installation">
+<h1>Installation:<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h1>
+<p>To install the <cite>ntac</cite> package, you can use pip:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>ntac
+</pre></div>
+</div>
+<p>Optionally, install cudatoolkit with conda to speed up unseeded NTAC:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>cudatoolkit
+</pre></div>
+</div>
+</section>
+<section id="quickstart-with-ntac">
+<h1>Quickstart with NTAC<a class="headerlink" href="#quickstart-with-ntac" title="Link to this heading">¶</a></h1>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">scipy.sparse</span> <span class="k">as</span> <span class="nn">sp</span>
+<span class="kn">from</span> <span class="nn">ntac</span> <span class="kn">import</span> <span class="n">Ntac</span><span class="p">,</span> <span class="n">sbm</span><span class="p">,</span> <span class="n">GraphData</span>
+
+<span class="c1"># Generate an adjacency matrix and labels from an SBM graph</span>
+<span class="n">A</span><span class="p">,</span> <span class="n">labels</span> <span class="o">=</span> <span class="n">sbm</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+
+
+
+<span class="c1">#NTAC requires a CSR array and labels as a string array</span>
+<span class="n">A_csr</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">csr_array</span><span class="p">(</span><span class="n">A</span><span class="p">)</span>
+<span class="n">labels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">])</span>
+<span class="c1"># NTAC can take in as input a CSR matrix and labels,</span>
+<span class="c1"># but it is easier to use the GraphData class for test_train split and metrics</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">GraphData</span><span class="p">(</span><span class="n">A_csr</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">)</span>
+
+<span class="c1">############################################</span>
+<span class="c1">#Seeded NTAC</span>
+<span class="c1">#use only 10% for training</span>
+<span class="n">train_indices</span><span class="p">,</span> <span class="n">test_indices</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">test_train_split</span><span class="p">(</span><span class="n">train_size</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">labels</span><span class="p">[</span><span class="n">test_indices</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;?&quot;</span> <span class="c1"># &quot;?&quot; indicates a nodes is unlabeled</span>
+<span class="c1">#Initialize NTAC with the data and labels</span>
+<span class="n">nt</span> <span class="o">=</span> <span class="n">Ntac</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">)</span>
+<span class="c1"># nt = Ntac(data=A_csr, labels=labels) # if you want to use CSR matrix directly</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
+   <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Step </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+   <span class="n">nt</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+   <span class="n">partition</span> <span class="o">=</span> <span class="n">nt</span><span class="o">.</span><span class="n">get_partition</span><span class="p">()</span>
+   <span class="c1">#partition = nt.get_topk_partition(5) # if we want to get the top 5 labels for each node</span>
+   <span class="n">metrics</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get_metrics</span><span class="p">(</span><span class="n">partition</span><span class="p">,</span> <span class="n">test_indices</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">labels</span><span class="p">)</span>
+   <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Accuracy: </span><span class="si">{</span><span class="n">metrics</span><span class="p">[</span><span class="s1">&#39;acc&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="c1">#can also get ARI, weighted F1, and topk accuracy (if using get_topk_partition)</span>
+
+<span class="c1">############################################</span>
+<span class="c1">#Unseed NTAC example</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Unseeded NTAC&quot;</span><span class="p">)</span>
+<span class="c1">#This will ignore the labels, even when provided</span>
+<span class="n">nt</span><span class="o">.</span><span class="n">solve_unseeded</span><span class="p">(</span><span class="n">max_k</span> <span class="o">=</span> <span class="mi">4</span><span class="p">)</span>
+<span class="n">nt</span><span class="o">.</span><span class="n">map_partition_to_gt_labels</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">labels</span><span class="p">)</span> <span class="c1">#Use the Hungarian algorithm to map the partition to the ground truth labels</span>
+<span class="n">partition</span> <span class="o">=</span> <span class="n">nt</span><span class="o">.</span><span class="n">get_partition</span><span class="p">()</span> <span class="c1">#unseeded does not support topk partition</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get_metrics</span><span class="p">(</span><span class="n">partition</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">n</span><span class="p">),</span> <span class="n">data</span><span class="o">.</span><span class="n">labels</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Accuracy: </span><span class="si">{</span><span class="n">metrics</span><span class="p">[</span><span class="s1">&#39;acc&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> ARI: </span><span class="si">{</span><span class="n">metrics</span><span class="p">[</span><span class="s1">&#39;ari&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Weighted F1: </span><span class="si">{</span><span class="n">metrics</span><span class="p">[</span><span class="s1">&#39;f1&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="flywire-examples">
+<h1>Flywire Examples:<a class="headerlink" href="#flywire-examples" title="Link to this heading">¶</a></h1>
+<p>See the examples for using NTAC in seeded and unseeded modes with the Flywire dataset:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="seeded_example.html">Seeded NTAC</a></p></li>
+<li><p><a class="reference external" href="unseeded_example.html">Unseeded NTAC</a></p></li>
+</ul>
 <div class="toctree-wrapper compound">
 </div>
 </section>
@@ -251,7 +326,15 @@ documentation for details.</p>
       <footer>
         
         <div class="related-pages">
-          
+          <a class="next-page" href="seeded_example.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Seeded NTAC example</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
           
         </div>
         <div class="bottom-of-page">
