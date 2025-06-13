@@ -1,9 +1,11 @@
-<img src="assets/logo.png" width="120" alt="NTAC logo" />&nbsp;&nbsp;
-<font size="7">NTAC</font>
+<span style="display: inline-flex; align-items: center;">
+  <img src="assets/logo.png" width="100" alt="NTAC logo" style="vertical-align: middle; margin-right: 10px;" />
+  <span style="font-size: 64px; color: #ccc;">NTAC</span>
+</span>
 
 
 
-<br>
+<!-- <br> -->
 
 This is a Python implementation of the Neuronal typing algorithm described in
 
