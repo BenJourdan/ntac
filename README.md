@@ -1,7 +1,4 @@
-<img src="assets/logo.png" width="120" alt="NTAC logo" />&nbsp;&nbsp;
-<font size="7">NTAC</font>
-
-
+<img src="assets/logo.png" width="320" alt="NTAC logo" />
 
 <br>
 
