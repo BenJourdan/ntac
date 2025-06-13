@@ -1,6 +1,7 @@
-# NTAC  <img src="assets//logo.png" align="right" height="100" alt="Designed by Haruka Udo" />
-
-<div style="margin-top: 30px;"></div>
+<div style="display: inline-flex; align-items: center; gap: 20px;">
+  <img src="assets/logo.png" height="70" alt="Designed by Haruka Udo" />
+  <h1 style="font-size:3em; margin: 0; line-height:1;">NTAC</h1>
+</div>
 
 <br>
 
