@@ -1,9 +1,9 @@
-<span style="display: inline-block; vertical-align: middle;">
-  <img src="assets/logo.png" width="100" alt="NTAC logo" style="vertical-align: middle;"/>
-</span>
-<span style="display: inline-block; vertical-align: middle; font-size: 64px; font-family: sans-serif; color: white;">
-  NTAC
-</span>
+<table>
+<tr>
+  <td><img src="assets/logo.png" width="100" alt="NTAC logo" /></td>
+  <td><strong style="font-size: 64px;">NTAC</strong></td>
+</tr>
+</table>
 
 
 
