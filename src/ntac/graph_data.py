@@ -37,7 +37,6 @@ class GraphData:
 
  
     def get_metrics(self, partition, indices, gt_labels, map_labels=False):
-        #TODO: make a pass and fix the doc strings at the end
         """
         Calculate evaluation metrics over the specified node indices.
 
@@ -356,7 +355,6 @@ class FAFBData(GraphData):
         return metrics
 
 
-    #TODO: make the file format for BANC and FAFB the same and change accordingly
     def load_graph_and_partition(self):
         """
         Loads graph structure and node data from CSV files; processes and filters data as required.
