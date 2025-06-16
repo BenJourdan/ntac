@@ -24,7 +24,7 @@ Install cudatoolkit with conda for optional speed for unseeded:
 
 
 
-## Qickstart with NTAC:
+## Quickstart with NTAC:
 ```python
 import numpy as np
 import scipy.sparse as sp
