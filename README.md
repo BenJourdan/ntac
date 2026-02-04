@@ -4,7 +4,7 @@
 
 This is a Python implementation of the Neuronal typing algorithm described in
 
-[Gregory Schwartzman, Ben Jourdan, David García-Soriano, Arie Matsliah. Connectivity Is All You Need: Inferring Neuronal Types with NTAC. bioRxiv. 2025](https://www.biorxiv.org/cgi/content/short/2025.06.11.659184v1)
+[Gregory Schwartzman, Ben Jourdan, David García-Soriano, Arie Matsliah. NTAC: Neuronal Type Assignment from Connectivity. Nature Communications 17, 1284 (2026)](https://doi.org/10.1038/s41467-025-68044-1)
 
 ## Neuronal Type Assignment from Connectivity
 
