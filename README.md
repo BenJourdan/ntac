@@ -13,6 +13,11 @@ NTAC (Neuronal Type Assignment from Connectivity) groups neurons into cell types
 - **Seeded (semi-supervised):** Requires a small fraction of neurons with known labels.  
 - **Unseeded (unsupervised):** Requires no labels.
 
+The seeded implementation also supports an optional nonnegative node-feature block.
+When provided, the feature block is appended to the structural NTAC embedding and
+therefore influences every seeded iteration through the same weighted-Jaccard
+similarity used by baseline NTAC.
+
 ## Installation:
 
 Install NTAC with:
@@ -68,6 +73,46 @@ partition = nt.get_partition() #unseeded does not support topk partition
 metrics = data.get_metrics(partition, range(data.n), data.labels)
 print(f"Accuracy: {metrics['acc']:.3f} ARI: {metrics['ari']:.3f}", f"Weighted F1: {metrics['f1']:.3f}")
 ```
+
+## Seeded NTAC with external node features
+
+```python
+import numpy as np
+import scipy.sparse as sp
+from ntac import Ntac
+
+A = sp.csr_array(
+    [
+        [0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
+    ]
+)
+labels = np.array(["A", "B", "?"], dtype=object)
+
+# Features must be nonnegative because seeded NTAC still uses weighted Jaccard.
+node_features = np.array(
+    [
+        [1.0, 0.0],
+        [0.0, 1.0],
+        [0.8, 0.2],
+    ],
+    dtype=float,
+)
+
+nt = Ntac(
+    data=A,
+    labels=labels,
+    node_features=node_features,
+    feature_weight=1.0,
+)
+nt.step()
+print(nt.get_partition())
+```
+
+In practice, it is usually worth preprocessing external features before passing
+them to NTAC so they are nonnegative and on a scale comparable to the structural
+embedding.
 
 ## Documentation & Examples using the Flywire dataset:
 

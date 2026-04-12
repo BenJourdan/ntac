@@ -18,13 +18,16 @@ class GraphData:
         labeled_nodes (np.array): Indices of nodes that are labeled.
         unique_labels (np.array): Unique set of labels found in the graph.
     """
-    def __init__(self, adj_csr, labels):
+    def __init__(self, adj_csr, labels, node_features=None):
         """
         Initialize GraphData with the provided adjacency matrix and labels.
         
         Parameters:
             adj_csr (scipy.sparse.csr_matrix): Sparse adjacency matrix in CSR format.
             labels (np.array): Array of labels (one per node); unlabeled nodes have label "?".
+            node_features (np.ndarray, optional): Optional nonnegative node-feature matrix
+                of shape (n_nodes, n_features). These features are not used by the
+                baseline seeded NTAC unless explicitly requested by the caller.
         """
         self.adj_csr = adj_csr
         self.adj_csc = adj_csr.tocsc()
@@ -34,6 +37,24 @@ class GraphData:
         self.labeled_nodes = np.where(self.labels != self.unlabeled_symbol)[0]
         #self.unique_labels = np.unique(self.labels)
         self.unique_labels  = np.unique(self.labels[self.labeled_nodes])
+        self.node_features = self._validate_node_features(node_features)
+
+
+    def _validate_node_features(self, node_features):
+        if node_features is None:
+            return None
+        features = np.asarray(node_features, dtype=np.float64)
+        if features.ndim == 1:
+            features = features.reshape(-1, 1)
+        if features.ndim != 2:
+            raise ValueError("node_features must be a 2D array")
+        if features.shape[0] != self.n:
+            raise ValueError(
+                f"node_features has {features.shape[0]} rows but graph has {self.n} nodes"
+            )
+        if np.any(features < 0):
+            raise ValueError("node_features must be nonnegative for weighted Jaccard similarity")
+        return features.copy()
 
  
     def get_metrics(self, partition, indices, gt_labels, map_labels=False):

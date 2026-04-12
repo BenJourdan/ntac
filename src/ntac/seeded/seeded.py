@@ -23,7 +23,16 @@ def _suppress_stdout():
         devnull.close()
 
 class Ntac:
-    def __init__(self, data, labels = None, lr=0.3, topk=1, verbose=False):
+    def __init__(
+        self,
+        data,
+        labels = None,
+        lr=0.3,
+        topk=1,
+        verbose=False,
+        node_features=None,
+        feature_weight=1.0,
+    ):
         """
         Initialize the supervised ntac model.
 
@@ -33,18 +42,25 @@ class Ntac:
         - lr: Learning rate for embedding updates.
         - topk: Number of neighbors to consider in majority voting.
         - verbose: If True, print debugging information.
+        - node_features: Optional nonnegative node-feature matrix to append to the
+          structural embedding used by weighted Jaccard. If `data` is a GraphData
+          instance and this argument is omitted, `data.node_features` is used.
+        - feature_weight: Nonnegative multiplier applied to the external feature block.
         """
         self.lr = lr
         self.topk = topk
         self.verbose = verbose
         self.initialized = False
+        self.feature_weight = float(feature_weight)
+        if self.feature_weight < 0:
+            raise ValueError("feature_weight must be nonnegative")
         
         # Check if data is of type csr_matrix; convert to GraphData if needed.
         type_error = "data should be of the type csr_matrix or graph_data"
         if sp.issparse(data):
             labels = np.array(["?"] * data.shape[0]) if labels is None else labels
             try:
-                data = GraphData(adj_csr=data, labels=labels)
+                data = GraphData(adj_csr=data, labels=labels, node_features=node_features)
             except Exception as e:
                 print(type_error, e)
                 raise
@@ -54,6 +70,7 @@ class Ntac:
                 labels = data.labels
 
         self.data = data
+        self.node_features = self._resolve_node_features(data, node_features)
 
         
         unique_labels = np.unique(labels)
@@ -69,6 +86,30 @@ class Ntac:
         self.reverse_mapping = {new: old for old, new in label_mapping.items()}
         self.labels = np.array([label_mapping[p] if p != data.unlabeled_symbol else -1 for p in labels])
         self.similarity_matrix_to_frozen = None
+
+
+    def _resolve_node_features(self, data, node_features):
+        features = data.node_features if node_features is None else node_features
+        if features is None or self.feature_weight == 0:
+            return None
+        features = np.asarray(features, dtype=np.float64)
+        if features.ndim == 1:
+            features = features.reshape(-1, 1)
+        if features.ndim != 2:
+            raise ValueError("node_features must be a 2D array")
+        if features.shape[0] != data.n:
+            raise ValueError(
+                f"node_features has {features.shape[0]} rows but graph has {data.n} nodes"
+            )
+        if np.any(features < 0):
+            raise ValueError("node_features must be nonnegative for weighted Jaccard similarity")
+        return features * self.feature_weight
+
+
+    def _augment_embedding_with_features(self, embedding):
+        if self.node_features is None:
+            return embedding
+        return np.concatenate([embedding, self.node_features], axis=1)
     
 
     def solve_unseeded(self, max_k, center_size=5, output_name=None, info_step=1, max_iterations=12, frac_seeds=0.1, chunk_size=6000):
@@ -133,7 +174,17 @@ class Ntac:
        
         partition[frozen_indices] = frozen_partition
         #_t = time.time()
-        self.embedding = self._generate_embedding(csr_indptr, csr_indices, csr_data, csc_indptr, csc_indices, csc_data, partition, self.k)
+        structural_embedding = self._generate_embedding(
+            csr_indptr,
+            csr_indices,
+            csr_data,
+            csc_indptr,
+            csc_indices,
+            csc_data,
+            partition,
+            self.k,
+        )
+        self.embedding = self._augment_embedding_with_features(structural_embedding)
         #self.time_spent_on_embedding += time.time() - _t
         #_t = time.time()
         self.similarity_matrix_to_frozen = self._generate_similarity_matrix_to_frozen(self.embedding, frozen_indices)
